@@ -29,43 +29,41 @@ class JsonStoragePolicy(StoragePolicy):
 class ArrayStoragePolicy(StoragePolicy):
     @staticmethod
     def dump(word_to_docs_mapping, filepath: str):
-        format_to_keys = ""
-        format_to_values = ""
         keys = list(word_to_docs_mapping.keys())
         values = list(word_to_docs_mapping.values())
+        format_str = ">1i"
+        item_to_pack = [len(keys)]
         for i in range(len(keys)):
-            values[i] = " ".join(values[i])
-            values[i] = values[i].encode()
-            keys[i] = keys[i].encode()
-            format_to_keys += f"{len(keys[i])}s"
-            format_to_values += f"{len(values[i])}s"
+            key = keys[i].encode()
+            # append key length
+            format_str += "1B"
+            item_to_pack.append(len(key))
+            # append key
+            format_str += f"{len(key)}s"
+            item_to_pack.append(key)
+            # append number values for key
+            format_str += "1h"
+            item_to_pack.append(len(values[i]))
+            # append values for key
+            for val in values[i]:
+                format_str += "1h"
+                item_to_pack.append(int(val))
 
-        format_to_keys = format_to_keys.encode()
-        format_to_values = format_to_values.encode()
-        obj_format_to_keys = struct.pack(f"{len(format_to_keys)}s", format_to_keys)
-        obj_format_to_values = struct.pack(f"{len(format_to_values)}s", format_to_values)
-        obj_keys = struct.pack(format_to_keys, *keys)
-        obj_values = struct.pack(format_to_values, *values)
+        pack_pbj = struct.pack(format_str, *item_to_pack)
         with open(filepath, "wb") as file:
-            file.write(obj_format_to_keys)
-            file.write("\n".encode())
-            file.write(obj_format_to_values)
-            file.write("\n".encode())
-            file.write(obj_keys)
-            file.write("\n".encode())
-            file.write(obj_values)
+            file.write(pack_pbj)
 
     @staticmethod
     def load(filepath: str):
+        keys = []
+        values = []
         with open(filepath, "rb") as file:
-            obj_format_to_keys = file.readline().strip()
-            obj_format_to_values = file.readline().strip()
-            obj_keys = file.readline().strip()
-            obj_values = file.readline().strip()
-
-        format_to_keys = struct.unpack(f"{len(obj_format_to_keys)}s", obj_format_to_keys)[0].decode()
-        format_to_values = struct.unpack(f"{len(obj_format_to_values)}s", obj_format_to_values)[0].decode()
-        keys = [key.decode() for key in struct.unpack(format_to_keys, obj_keys)]
-        values = [value.decode().split() for value in struct.unpack(format_to_values, obj_values)]
+            num_items = struct.unpack(">1i", file.read(4))[0]
+            for _ in range(num_items):
+                len_key = struct.unpack(">1B", file.read(1))[0]
+                keys.append(struct.unpack(f">{len_key}s", file.read(len_key))[0].decode())
+                num_vals = struct.unpack(">1h", file.read(2))[0]
+                vals = list(struct.unpack(f">{num_vals}h", file.read(num_vals * 2)))
+                values.append(list(map(str, vals)))
 
         return dict(zip(keys, values))

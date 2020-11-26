@@ -40,15 +40,9 @@ class InvertedIndex:
         if not words:
             return []
 
-        if self.inv_idx_dict.get(words[0]):
-            result = set(self.inv_idx_dict[words[0]])
-        else:
-            return []
-
+        result = set(self.inv_idx_dict.get(words[0], []))
         for word in words:
-            result.intersection_update(
-                self.inv_idx_dict.get(word) if self.inv_idx_dict.get(word) else []
-            )
+            result.intersection_update(self.inv_idx_dict.get(word, set()))
 
         return list(result)
 
@@ -93,7 +87,7 @@ def load_documents(filepath: str) -> List[str]:
     with open(filepath, encoding="utf_8") as file:
         line = file.readline()
         while line:
-            data.append(line.strip())
+            data.append(line.rstrip("\n"))
             line = file.readline()
 
     return data
@@ -105,9 +99,8 @@ def build_inverted_index(documents: List[str]) -> InvertedIndex:
     inv_idx_dict = defaultdict(set)
 
     for document in documents:
-        document_id, *data = document.strip("\t").strip().split()
+        document_id, *data = document.split()
         for word in data:
-            word = word.strip()
             document_id = document_id.strip()
             inv_idx_dict[word].add(document_id)
 
@@ -135,12 +128,10 @@ def callback_query(arguments):
     if arguments.queries:
         queries = arguments.queries
     elif arguments.query_file:
-        queries = arguments.query_file
+        [[queries.append(sub_el) for sub_el in el.rstrip().split()] for el in arguments.query_file]
 
-    for query in queries:
-        query = query.strip()
-        document_ids = inverted_index.query(query)
-        print(",".join(document_ids), file=sys.stdout)
+    document_ids = inverted_index.query(queries)
+    print(",".join(document_ids), file=sys.stdout)
 
 
 def setup_parser(parser):
