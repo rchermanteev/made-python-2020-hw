@@ -128,10 +128,11 @@ def callback_query(arguments):
     if arguments.queries:
         queries = arguments.queries
     elif arguments.query_file:
-        [[queries.append(sub_el) for sub_el in el.rstrip().split()] for el in arguments.query_file]
+        queries = [el.strip().split() for el in arguments.query_file]
 
-    document_ids = inverted_index.query(queries)
-    print(",".join(document_ids), file=sys.stdout)
+    for query in queries:
+        document_ids = inverted_index.query(query)
+        print(",".join(document_ids), file=sys.stdout)
 
 
 def setup_parser(parser):
@@ -171,7 +172,7 @@ def setup_parser(parser):
         help="path to query in encoding cp1251"
     )
     query_parser.add_argument(
-        "--query", required=False, nargs="+", dest="queries",
+        "--query", required=False, nargs="+", dest="queries", action="append",
         metavar="WORD",
         help="query to run against inverted index"
     )
