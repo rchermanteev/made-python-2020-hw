@@ -8,7 +8,13 @@ from re import findall
 import sys
 from typing import List
 
+import logging
+import logging.config
+import yaml
+
 from lxml import etree
+
+DEFAULT_LOGGING_CONFIG_FILEPATH = "logging.conf.yml"
 
 
 class StackoverflowAnalytics:
@@ -33,6 +39,8 @@ class StackoverflowAnalytics:
     """
     def __init__(self):
         self._data = defaultdict(dict)
+        logger = logging.getLogger("stackoverflow_analytics")
+        self.logger = logger
 
     @staticmethod
     def _preprocess_date_in_post(date_time: str) -> int:
@@ -77,6 +85,7 @@ class StackoverflowAnalytics:
             'short': 74, 'in': 74, 'literal': 74}
         }
         """
+        self.logger.info("start build data to analysis...")
         for post in posts:
             xml_post = etree.fromstring(post)
             if xml_post.attrib["PostTypeId"] == '1':
@@ -93,6 +102,8 @@ class StackoverflowAnalytics:
                     else:
                         self._data[year] = {word: score}
 
+        self.logger.info("finish build data to analysis...")
+
     @staticmethod
     def _format_top_to_result(data):
         return list(map(list, data))
@@ -102,7 +113,10 @@ class StackoverflowAnalytics:
 
         format return: json-line
         """
-        query_data = self._data[start_year]
+        self.logger.info("start processing query...")
+        self.logger.debug("got query: start_year(%s) end_year(%s) num_words(%s)", start_year, end_year, num_words)
+
+        query_data = self._data[start_year].copy()
         for year in range(start_year + 1, end_year + 1):
             if year in self._data:
                 data_from_year = self._data[year].items()
@@ -116,12 +130,21 @@ class StackoverflowAnalytics:
             sorted(query_data.items(), key=lambda x: x[0]),
             key=lambda x: x[1], reverse=True
         )
+        if len(query_data) < num_words:
+            self.logger.warning(
+                "not enough data to answer, found top_K(%s) words out of top_N(%s) for period %s - %s",
+                len(query_data),
+                num_words,
+                start_year,
+                end_year
+            )
         result = {
             "start": start_year,
             "end": end_year,
             "top": self._format_top_to_result(query_data[:num_words])
         }
         result = json.dumps(result)
+        self.logger.info("finish processing query...")
 
         return result
 
@@ -140,22 +163,31 @@ def load_data(filepath: str, encoding: str = "utf-8") -> List[str]:
 
 def load_posts(filepath: str) -> List[str]:
     """Load posts from hard drive"""
-    print("start load posts...", file=sys.stderr)
-    return load_data(filepath, encoding="utf-8")
+    logger = logging.getLogger("stackoverflow_analytics")
+    logger.info("start load posts...")
+    posts = load_data(filepath, encoding="utf-8")
+    logger.info("finish load posts...")
+    return posts
 
 
 def load_stop_words(filepath: str) -> List[str]:
     """Load stop words from hard drive"""
-    print("start load stop words...", file=sys.stderr)
-    return load_data(filepath, encoding="koi8-r")
+    logger = logging.getLogger("stackoverflow_analytics")
+    logger.info("start load stop words...")
+    stop_words = load_data(filepath, encoding="koi8-r")
+    logger.info("finish load stop words...")
+    return stop_words
 
 
 def load_queries(filepath: str) -> List[List[int]]:
     """Load queries from hard drive"""
-    print("start load queries...", file=sys.stderr)
+    logger = logging.getLogger("stackoverflow_analytics")
+    logger.info("start load queries...")
     dirty_queries = load_data(filepath, encoding="utf-8")
-    print("start process queries...", file=sys.stderr)
+    logger.info("finish load queries...")
+    logger.info("start process queries...")
     queries = [list(map(int, query.split(','))) for query in dirty_queries]
+    logger.info("finish process queries...")
     return queries
 
 
@@ -187,13 +219,22 @@ def setup_parser(parser):
     parser.set_defaults(callback=callback_parser)
 
 
+def setup_logging():
+    with open(DEFAULT_LOGGING_CONFIG_FILEPATH) as config_fin:
+        logging.config.dictConfig(yaml.safe_load(config_fin))
+
+
 def main():
     parser = ArgumentParser(
         prog="stackoverflow-analytics",
         description="stackoverflow analytics tool",
     )
     setup_parser(parser)
+    setup_logging()
+    logger = logging.getLogger("stackoverflow_analytics")
+    logger.info("run application")
     arguments = parser.parse_args()
+    logger.debug("get arguments: %s", repr(arguments))
     arguments.callback(arguments)
 
 
