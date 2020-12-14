@@ -85,7 +85,6 @@ class StackoverflowAnalytics:
             'short': 74, 'in': 74, 'literal': 74}
         }
         """
-        self.logger.info("start build data to analysis...")
         for post in posts:
             xml_post = etree.fromstring(post)
             if xml_post.attrib["PostTypeId"] == '1':
@@ -102,8 +101,6 @@ class StackoverflowAnalytics:
                     else:
                         self._data[year] = {word: score}
 
-        self.logger.info("finish build data to analysis...")
-
     @staticmethod
     def _format_top_to_result(data):
         return list(map(list, data))
@@ -113,9 +110,7 @@ class StackoverflowAnalytics:
 
         format return: json-line
         """
-        self.logger.info("start processing query...")
-        self.logger.debug("got query: start_year(%s) end_year(%s) num_words(%s)", start_year, end_year, num_words)
-
+        self.logger.debug("got query %s,%s,%s", start_year, end_year, num_words)
         query_data = self._data[start_year].copy()
         for year in range(start_year + 1, end_year + 1):
             if year in self._data:
@@ -132,7 +127,7 @@ class StackoverflowAnalytics:
         )
         if len(query_data) < num_words:
             self.logger.warning(
-                "not enough data to answer, found top_K(%s) words out of top_N(%s) for period %s - %s",
+                'not enough data to answer, found %s words out of %s for period "%s,%s"',
                 len(query_data),
                 num_words,
                 start_year,
@@ -144,7 +139,6 @@ class StackoverflowAnalytics:
             "top": self._format_top_to_result(query_data[:num_words])
         }
         result = json.dumps(result)
-        self.logger.info("finish processing query...")
 
         return result
 
@@ -163,44 +157,37 @@ def load_data(filepath: str, encoding: str = "utf-8") -> List[str]:
 
 def load_posts(filepath: str) -> List[str]:
     """Load posts from hard drive"""
-    logger = logging.getLogger("stackoverflow_analytics")
-    logger.info("start load posts...")
     posts = load_data(filepath, encoding="utf-8")
-    logger.info("finish load posts...")
     return posts
 
 
 def load_stop_words(filepath: str) -> List[str]:
     """Load stop words from hard drive"""
-    logger = logging.getLogger("stackoverflow_analytics")
-    logger.info("start load stop words...")
     stop_words = load_data(filepath, encoding="koi8-r")
-    logger.info("finish load stop words...")
     return stop_words
 
 
 def load_queries(filepath: str) -> List[List[int]]:
     """Load queries from hard drive"""
-    logger = logging.getLogger("stackoverflow_analytics")
-    logger.info("start load queries...")
     dirty_queries = load_data(filepath, encoding="utf-8")
-    logger.info("finish load queries...")
-    logger.info("start process queries...")
     queries = [list(map(int, query.split(','))) for query in dirty_queries]
-    logger.info("finish process queries...")
     return queries
 
 
 def callback_parser(arguments):
     """Base callback for program"""
+    logger = logging.getLogger("stackoverflow_analytics")
     stop_words = load_stop_words(arguments.path_to_stop_words_dataset)
     posts = load_posts(arguments.path_to_questions_dataset)
     sof_analytics = StackoverflowAnalytics()
     sof_analytics.build_data_to_analysis(posts, stop_words)
+    logger.info("process XML dataset, ready to serve queries")
     queries = load_queries(arguments.path_to_query_file)
     for query in queries:
         response = sof_analytics.query(*query)
         print(response, file=sys.stdout)
+
+    logger.info("finish processing queries")
 
 
 def setup_parser(parser):
@@ -231,10 +218,7 @@ def main():
     )
     setup_parser(parser)
     setup_logging()
-    logger = logging.getLogger("stackoverflow_analytics")
-    logger.info("run application")
     arguments = parser.parse_args()
-    logger.debug("get arguments: %s", repr(arguments))
     arguments.callback(arguments)
 
 
