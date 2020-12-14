@@ -184,11 +184,32 @@ def custom_data_to_analysis():
     [
         pytest.param(
             2019, 2019, 2,
-            {"start": 2019, "end": 2019, "top": [ ["seo", 15], ["better", 10]]},
+            {"start": 2019, "end": 2019, "top": [
+                ["seo", 15],
+                ["better", 10]
+            ]},
         ),
         pytest.param(
             2019, 2020, 4,
-            {"start": 2019, "end": 2020, "top": [["better", 30], ["javascript", 20], ["python", 20], ["seo", 15]]},
+            {"start": 2019, "end": 2020, "top": [
+                ["better", 30],
+                ["javascript", 20],
+                ["python", 20],
+                ["seo", 15]
+            ]},
+        ),
+        pytest.param(
+            2019, 2020, 40,
+            {"start": 2019, "end": 2020, "top": [
+                ["better", 30],
+                ["javascript", 20],
+                ["python", 20],
+                ["seo", 15],
+                ["done", 10],
+                ["repetition", 10],
+                ["with", 10],
+                ["what", 5]
+            ]},
         ),
     ],
 )
